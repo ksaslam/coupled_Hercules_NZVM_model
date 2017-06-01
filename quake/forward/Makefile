@@ -1,0 +1,141 @@
+# -*- Makefile -*-
+# 
+#
+ifndef WORKDIR
+  WORKDIR = $(PWD)/../..
+endif
+
+include $(WORKDIR)/systemdef.mk
+include $(WORKDIR)/common.mk
+
+# Earthquake related, set these in user.mk
+#
+# -DDAMPING
+# -DDEBUG_OVERFLOW
+# -DAUTO_DELTA_T
+# -DVALIDATION
+# -DHALFSPACE
+# -DBOUNDARY
+SOLVE_CPPFLAGS ?= -DHALFSPACE -DBOUNDARY  
+
+
+LOADLIBES = $(CVM_DIR)/cvm.o $(OCTOR_LIB) $(ETREE_LIB) 
+
+#
+# Is vis enabled?
+#
+ifeq (${ENABLE_VIZ},1)
+  VIS_CPPFLAGS ?= -DVISINTERVAL=10 
+  VIS_CPPFLAGS += -DVIS -I${VIS_DIR}
+  LOADLIBES += $(VIS_LIB) $(JPEG_LIB)
+endif
+
+# I/O
+# -DNO_OUTPUT
+# -DUSERCVMDB
+IO_CPPFLAGS ?= -DUSECVMDB 
+
+
+CPPFLAGS += -I$(ETREE_DIR) -I$(CVM_DIR) -I$(OCTOR_DIR) -I.
+CPPFLAGS += $(SOLVE_CPPFLAGS) $(IO_CPPFLAGS) $(VIS_CPPFLAGS)
+
+LDFLAGS += -lm
+
+ifeq ($(SYSTEM), BGW)
+  LOADLIBES += /bgl/local/lib/libmpihpm_c.a /bgl/BlueLight/ppcfloor/bglsys/lib/libbgl_perfctr.rts.a
+endif
+
+#
+# Object modules 
+#
+PSOLVE_OBJECTS = psolve.o nrutila.o quakesource.o geometrics.o nonlinear.o XYtoLL.o \
+	BrocherCorrelations.o EPtomo2010subMod.o NaNsubMod.o assignValues.o basinSubModels.o callRoutines.o createOutputDirectories.o \
+	determineSurfaceDepths.o extractPartialMesh.o findAdjacentPoints.o findSubVeloModelInd.o generateModelGrid.o generateProfile.o \
+	getSurfSubModNames.o linearInterpolation.o loadAllData.o loadBasins.o loadSurface.o mathFunctions.o pointInPoly.o readWriteInputFiles.o \
+	sliceFunctions.o testfile.o v1DsubMod.o writeCVMData.o writeGridPoints.o writeLatLonData.o writeLogFiles.o \
+	commutil.o util.o output.o io_planes.o io_checkpoint.o stiffness.o damping.o quake_util.o timers.o buildings.o meshformatlab.o drm.o 
+
+OBJECTS = qmesh.o q4.o single_query.o ${PSOLVE_OBJECTS}
+
+.PHONY: all tags clean cleanall move_cxx_repository
+
+all: move_cxx_repository $(TARGET)
+
+TARGET = qmesh psolve single_query q4showmeta
+
+qmesh: qmesh.o
+
+psolve: ${PSOLVE_OBJECTS} ${OCTOR_LIB}
+	$(LD) $^ \
+	$(LOADLIBES) \
+	$(LDFLAGS) \
+	-o $@
+
+q4showmeta: q4showmeta.o util.o
+
+psolve_output: psolve_output.o
+
+psolve_output.o: psolve.o
+	cp -f psolve.o psolve_output.o
+
+psolve_debug: psolve_debug.o 
+
+psolve_debug.o: psolve.o nrutila.o quakesource.o geometrics.o io_planes.o io_checkpoint.o
+	cp -f psolve.o psolve_debug.o
+
+psolve_novis: psolve_novis.o
+
+psolve_novis.o: psolve.o
+	cp -f psolve.o psolve_novis.o
+
+single_query: single_query.o q4.o
+
+output.o: output.c output.h psolve.h
+psolve.o: psolve.c psolve.h output.h quakesource.h nonlinear.h io_planes.h \
+          io_checkpoint.h stiffness.h damping.h quake_util.h timers.h buildings.h meshformatlab.h drm.h        
+quakesource.o: quakesource.c quakesource.h psolve.h
+XYtoLL.o: XYtoLL.c
+
+BrocherCorrelations.c:	BrocherCorrelations.o
+EPtomo2010subMod.c:	EPtomo2010subMod.o
+NaNsubMod.c:	NaNsubMod.o
+assignValues.c:	assignValues.o
+basinSubModels.c:	basinSubModels.o
+callRoutines.c:	callRoutines.o
+createOutputDirectories.c:	createOutputDirectories.o
+determineSurfaceDepths.c:	determineSurfaceDepths.o
+extractPartialMesh.c:	extractPartialMesh.o
+findAdjacentPoints.c:	findAdjacentPoints.o
+findSubVeloModelInd.c:	findSubVeloModelInd.o
+generateModelGrid.c:	generateModelGrid.o
+generateProfile.c:	generateProfile.o
+getSurfSubModNames.c:	getSurfSubModNames.o
+linearInterpolation.c:	linearInterpolation.o
+loadAllData.c:	loadAllData.o
+loadBasins.c:	loadBasins.o
+loadSurface.c:	loadSurface.o
+mathFunctions.c:	mathFunctions.o
+pointInPoly.c:	pointInPoly.o
+readWriteInputFiles.c:	readWriteInputFiles.o
+sliceFunctions.c:	sliceFunctions.o
+testfile.c:	testfile.o
+v1DsubMod.c:	v1DsubMod.o
+writeCVMData.c:	writeCVMData.o
+writeGridPoints.c:	writeGridPoints.o
+writeLatLonData.c:	writeLatLonData.o
+writeLogFiles.c:	writeLogFiles.o
+
+all: $(TARGET)
+
+clean:
+	rm -f $(OBJECTS)  core *.o *~ 
+
+cleanall:
+	rm -f $(OBJECTS)  $(TARGET) core *~
+
+TAGS:
+	etags *.c *.h
+
+tags:	TAGS
+
+# $Id: Makefile,v 1.20 2011/10/07 15:00:10 yisbilir Exp $
